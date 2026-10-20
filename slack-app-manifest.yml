@@ -1,0 +1,26 @@
+# Creá la app en https://api.slack.com/apps > Create New App > From a manifest
+# Reemplazá TU-DOMINIO por la URL de tu despliegue (por ejemplo flockpit.vercel.app).
+display_information:
+  name: Flockpit
+  description: Tu trabajo de Slack, Teams y Microsoft 365 en un solo lugar.
+  background_color: "#6a2bd9"
+oauth_config:
+  redirect_urls:
+    - https://TU-DOMINIO/api/connect/slack/callback
+    - http://localhost:3000/api/connect/slack/callback
+  scopes:
+    user:
+      - search:read
+      - channels:history
+      - groups:history
+      - im:history
+      - mpim:history
+      - channels:read
+      - groups:read
+      - im:read
+      - mpim:read
+      - users:read
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false
