@@ -1,12 +1,15 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { handle, requireUser, HttpError } from '@/lib/http';
 import { graph } from '@/lib/microsoft';
 import { slack, slackConn, slackText, slackUserName } from '@/lib/slack';
+import { demoThread } from '@/lib/demo';
 
 // Mensajes de una conversación (con respuestas del hilo) para leer dentro de Flockpit.
 export async function GET(_: Request, { params }: { params: { id: string } }) {
   return handle(async () => {
     const s = await requireUser(), key = decodeURIComponent(params.id);
+    if (s.demo) return NextResponse.json({ messages: demoThread(key) });
     if (key.startsWith('teams:')) {
       const r = await graph<{ value: any[] }>(s.uid, `/me/chats/${encodeURIComponent(key.slice(6))}/messages?$top=40`);
       const msgs = r.value.filter((m) => m.messageType === 'message').map((m) => ({

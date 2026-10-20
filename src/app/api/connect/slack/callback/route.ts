@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { slackExchange, saveSlackConnection } from '@/lib/slack';
 import { getSession, takeOAuthState } from '@/lib/session';

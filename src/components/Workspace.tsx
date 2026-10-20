@@ -8,7 +8,7 @@ type Conv = { key: string; platform: 'teams' | 'slack'; kind: string; title: str
 type Task = { id: string; description: string; project: string; owner: string; due: string | null; priority: 'alta' | 'media' | 'baja'; status: string; note: string; source_key: string | null; sources: any[]; event_at: string | null };
 type Prop = { id: string; key: string; action: string; project: string | null; owner: string | null; due: string | null; priority: string; reason: string | null; kind: string | null; sources: any[] };
 type Sync = { source: string; last_success_at: string | null; prev_success_at: string | null; last_error: string | null; last_error_at: string | null; meta: any };
-type Day = { me: { name: string; email: string }; mail: Mail[]; events: Ev[]; convs: Conv[]; tasks: Task[]; proposals: Prop[]; reviews: { item_key: string; last_id: string | null }[]; sync: Sync[]; conns: { provider: string; status: string; last_error: string | null }[] };
+type Day = { me: { name: string; email: string }; demo?: boolean; mail: Mail[]; events: Ev[]; convs: Conv[]; tasks: Task[]; proposals: Prop[]; reviews: { item_key: string; last_id: string | null }[]; sync: Sync[]; conns: { provider: string; status: string; last_error: string | null }[] };
 
 /* ---------- utilidades ---------- */
 const TZ = 'America/Argentina/Buenos_Aires';
@@ -220,7 +220,7 @@ export default function Workspace({ firstName }: { firstName: string }) {
       <main className="main">
         <div className="d6">
           <header className="h6">
-            <div><h1>Buen día, <span>{firstName}</span></h1><div className="h6-d">{cap(fmt(new Date(), { weekday: 'long', day: 'numeric', month: 'long' }))}</div></div>
+            <div><h1>Buen día, <span>{firstName}</span></h1>{day.demo && <span className="demo-tag">Modo demo · datos ficticios</span>}<div className="h6-d">{cap(fmt(new Date(), { weekday: 'long', day: 'numeric', month: 'long' }))}</div></div>
             <button className="sync5" onClick={() => setPanel({ type: 'status', id: '' })}><i className={syncLabel.cls} />{syncLabel.text}</button>
             <button className="btn6" disabled={syncing} onClick={() => sync(false)}>{syncing ? 'Actualizando…' : 'Actualizar'}</button>
           </header>

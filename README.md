@@ -60,25 +60,26 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 Corré el comando tres veces y usá un valor distinto para cada variable.
 
-## Paso 4 · Registrar la app en Microsoft Entra
+## Paso 4 · Registrar la app en Microsoft (cuenta personal)
 
-1. Entrá a [entra.microsoft.com](https://entra.microsoft.com) → **Applications → App registrations → New registration**.
-2. Nombre: `Flockpit`.
-3. Tipos de cuenta: **Solo cuentas de este directorio organizativo** (solo Flock).
-4. URI de redirección: plataforma **Web**, valor `https://TU-DOMINIO/api/auth/microsoft/callback`. Agregá también `http://localhost:3000/api/auth/microsoft/callback` para probar en tu computadora.
-5. Registrá y copiá:
-   - **Application (client) ID** → `MS_CLIENT_ID`
-   - **Directory (tenant) ID** → `MS_TENANT_ID`
-6. En **Certificates & secrets → New client secret**, copiá el **Value** → `MS_CLIENT_SECRET`. Anotá cuándo vence para renovarlo.
-7. En **API permissions → Add a permission → Microsoft Graph → Delegated permissions**, agregá: `User.Read`, `Mail.Read`, `Calendars.Read`, `Chat.Read`, `offline_access`, `openid`, `profile`, `email`.
+Para un uso experimental conviene usar una cuenta personal de Microsoft (Outlook.com o Hotmail): ahí vos aceptás los permisos, sin aprobación de ningún administrador. Con cuentas laborales, muchas organizaciones exigen que un administrador apruebe la app.
 
-No hace falta tocar **Grant admin consent**: cada persona acepta sus permisos al iniciar sesión. Si Flock no permite que los usuarios acepten permisos, al iniciar sesión vas a ver «Necesita aprobación del administrador» con un botón para pedirla.
+1. En el registro de la app (**App registrations → Flockpit → Authentication**), en **Supported account types**, elegí **Personal Microsoft accounts only**.
+2. En **Redirect URIs** (plataforma Web) dejá `https://TU-DOMINIO/api/auth/microsoft/callback`.
+3. En Vercel cargá `MS_TENANT_ID=consumers` y `MS_INCLUDE_TEAMS=false` (Teams solo existe en cuentas laborales).
+4. Copiá **Application (client) ID** → `MS_CLIENT_ID` y creá un secreto en **Certificates & secrets** → `MS_CLIENT_SECRET`.
+5. En **API permissions** alcanzan: `User.Read`, `Mail.Read`, `Calendars.Read`, `offline_access`, `openid`, `profile`, `email`.
+
+Si al cambiar el tipo de cuentas aparece un error sobre `requestedAccessTokenVersion`, entrá a **Manifest**, cambiá ese valor a `2`, guardá y repetí el paso 1.
+
+**Modo demo:** en la pantalla de inicio, «Probar con datos de ejemplo» muestra la app completa con datos ficticios, sin conectar ninguna cuenta.
 
 ## Paso 5 · Crear la app de Slack
 
-1. Abrí `slack-app-manifest.yml` y reemplazá `TU-DOMINIO` por tu URL de Vercel.
-2. En [api.slack.com/apps](https://api.slack.com/apps) tocá **Create New App → From a manifest**, elegí el workspace de Flock y pegá el manifiesto.
-3. En **Basic Information** copiá **Client ID** → `SLACK_CLIENT_ID` y **Client Secret** → `SLACK_CLIENT_SECRET`.
+1. Si no querés usar el Slack de tu empresa, creá un workspace gratuito en [slack.com/get-started](https://slack.com/get-started): ahí sos la administradora y no necesitás aprobación.
+2. Abrí `slack-app-manifest.yml` y reemplazá `TU-DOMINIO` por tu URL de Vercel.
+3. En [api.slack.com/apps](https://api.slack.com/apps) tocá **Create New App → From a manifest**, elegí tu workspace y pegá el manifiesto.
+4. En **Basic Information** copiá **Client ID** → `SLACK_CLIENT_ID` y **Client Secret** → `SLACK_CLIENT_SECRET`.
 
 Si el workspace exige aprobación de apps, Slack te muestra «Solicitar instalación» al conectar.
 

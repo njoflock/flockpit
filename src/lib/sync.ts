@@ -1,5 +1,5 @@
 import { db, must } from './db';
-import { graph } from './microsoft';
+import { graph, includeTeams } from './microsoft';
 import { slack, slackConn, slackText, slackUserName } from './slack';
 import { analyzeUser } from './analyze';
 
@@ -117,6 +117,7 @@ async function syncSlack(uid: string) {
 
 export async function syncUser(uid: string, sources: Source[] = ['mail', 'calendar', 'teams', 'slack']) {
   const user = await must(db().from('users').select('ms_oid').eq('id', uid).single()) as { ms_oid: string };
+  if (user.ms_oid.startsWith('demo-')) return { demo: { ok: true, note: 'Modo demo: datos de ejemplo, sin conexiones.' } };
   const out: Record<string, unknown> = {};
   const run = async (s: Source, fn: () => Promise<unknown>) => {
     try { const meta = await fn(); out[s] = { ok: true, ...(meta as object) }; await mark(uid, s, true, undefined, meta as Record<string, unknown>); }
@@ -124,7 +125,7 @@ export async function syncUser(uid: string, sources: Source[] = ['mail', 'calend
   };
   if (sources.includes('mail')) await run('mail', () => syncMail(uid));
   if (sources.includes('calendar')) await run('calendar', () => syncCalendar(uid));
-  if (sources.includes('teams')) await run('teams', () => syncTeams(uid, user.ms_oid));
+  if (sources.includes('teams') && includeTeams()) await run('teams', () => syncTeams(uid, user.ms_oid));
   if (sources.includes('slack')) await run('slack', () => syncSlack(uid));
   try { out.analysis = await analyzeUser(uid); await mark(uid, 'analysis', true); }
   catch (e) { const msg = e instanceof Error ? e.message : String(e); out.analysis = { ok: false, error: msg }; await mark(uid, 'analysis', false, msg); }

@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { msExchangeCode, saveMsConnection } from '@/lib/microsoft';
 import { createSession, takeOAuthState } from '@/lib/session';

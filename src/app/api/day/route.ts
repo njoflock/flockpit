@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { handle, requireUser } from '@/lib/http';
 import { db, must } from '@/lib/db';
@@ -17,6 +18,6 @@ export async function GET() {
       must(d.from('sync_state').select('*').eq('user_id', uid)),
       must(d.from('connections').select('provider,status,last_error,updated_at').eq('user_id', uid)),
     ]);
-    return NextResponse.json({ me: s, mail, events, convs, tasks, proposals, reviews, sync, conns });
+    return NextResponse.json({ me: s, demo: !!s.demo, mail, events, convs, tasks, proposals, reviews, sync, conns });
   });
 }

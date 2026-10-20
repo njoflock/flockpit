@@ -23,6 +23,7 @@ export default async function Ajustes({ searchParams }: { searchParams: { ok?: s
       <a href="/" className="lk6">← Volver a Mi día</a>
       <h1>Ajustes</h1>
       <p className="muted">Sesión de {s.email}</p>
+      {s.demo && <div className="ok-box">Estás en modo demo: los datos son ficticios. Para usar tus cuentas, cerrá sesión e iniciá con Microsoft.</div>}
       {searchParams.ok && <div className="ok-box">Slack quedó conectado y sincronizado.</div>}
       {searchParams.error && <div className="login-error">{searchParams.error}</div>}
       <h2>Conexiones</h2>

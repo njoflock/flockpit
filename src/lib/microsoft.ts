@@ -4,14 +4,16 @@ import { db, must } from './db';
 import { encrypt, decrypt } from './crypto';
 
 // Permisos que se piden al conectarse. La pantalla de Microsoft se los muestra a la persona.
-export const MS_SCOPES = ['openid', 'profile', 'email', 'offline_access', 'User.Read', 'Mail.Read', 'Calendars.Read', 'Chat.Read'];
+// Con cuentas personales (Outlook.com) no existe Teams: usá MS_INCLUDE_TEAMS=false.
+export const includeTeams = () => process.env.MS_INCLUDE_TEAMS !== 'false';
+export const MS_SCOPES_LIST = () => ['openid', 'profile', 'email', 'offline_access', 'User.Read', 'Mail.Read', 'Calendars.Read', ...(includeTeams() ? ['Chat.Read'] : [])];
 const AUTH = () => `https://login.microsoftonline.com/${env.msTenant()}/oauth2/v2.0`;
 export const msRedirect = () => `${env.appUrl()}/api/auth/microsoft/callback`;
 
 export function msAuthorizeUrl(state: string) {
   const p = new URLSearchParams({
     client_id: env.msClientId(), response_type: 'code', redirect_uri: msRedirect(), response_mode: 'query',
-    scope: MS_SCOPES.join(' '), state, prompt: 'select_account',
+    scope: MS_SCOPES_LIST().join(' '), state, prompt: 'select_account',
   });
   return `${AUTH()}/authorize?${p}`;
 }
@@ -29,11 +31,11 @@ async function tokenRequest(body: Record<string, string>): Promise<TokenResponse
 }
 
 export async function msExchangeCode(code: string) {
-  const t = await tokenRequest({ grant_type: 'authorization_code', code, redirect_uri: msRedirect(), scope: MS_SCOPES.join(' ') });
+  const t = await tokenRequest({ grant_type: 'authorization_code', code, redirect_uri: msRedirect(), scope: MS_SCOPES_LIST().join(' ') });
   const claims = t.id_token ? decodeJwt(t.id_token) : {};
   return {
     token: t,
-    oid: String(claims.oid || ''),
+    oid: String(claims.oid || claims.sub || ''),
     email: String(claims.preferred_username || claims.email || ''),
     name: String(claims.name || ''),
   };
@@ -41,7 +43,7 @@ export async function msExchangeCode(code: string) {
 
 export async function saveMsConnection(userId: string, oid: string, t: TokenResponse) {
   await must(db().from('connections').upsert({
-    user_id: userId, provider: 'microsoft', external_user_id: oid, scopes: t.scope || MS_SCOPES.join(' '),
+    user_id: userId, provider: 'microsoft', external_user_id: oid, scopes: t.scope || MS_SCOPES_LIST().join(' '),
     access_token_enc: encrypt(t.access_token), refresh_token_enc: t.refresh_token ? encrypt(t.refresh_token) : null,
     expires_at: new Date(Date.now() + (t.expires_in - 60) * 1000).toISOString(), status: 'ok', last_error: null, updated_at: new Date().toISOString(),
   }));
@@ -55,7 +57,7 @@ export async function msToken(userId: string): Promise<string> {
   if (Date.parse(row.expires_at) > Date.now()) return decrypt(row.access_token_enc);
   if (!row.refresh_token_enc) throw new Error('La sesión de Microsoft venció. Volvé a iniciar sesión.');
   try {
-    const t = await tokenRequest({ grant_type: 'refresh_token', refresh_token: decrypt(row.refresh_token_enc), scope: MS_SCOPES.join(' ') });
+    const t = await tokenRequest({ grant_type: 'refresh_token', refresh_token: decrypt(row.refresh_token_enc), scope: MS_SCOPES_LIST().join(' ') });
     await saveMsConnection(userId, row.external_user_id, { ...t, refresh_token: t.refresh_token || decrypt(row.refresh_token_enc) });
     return t.access_token;
   } catch (e) {

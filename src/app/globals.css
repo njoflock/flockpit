@@ -126,6 +126,8 @@ a{color:var(--violet)}
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#211A33;color:#fff;border-radius:12px;padding:12px 16px;display:flex;gap:12px;align-items:center;z-index:60;box-shadow:0 10px 30px rgba(20,10,40,.25)}
 .toast button{border:0;background:rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-weight:600}
 /* acceso y ajustes */
+.demo-tag{display:inline-block;margin-left:10px;font-size:12px;font-weight:700;color:#9A5200;background:#FFF1DF;border-radius:999px;padding:3px 10px;vertical-align:middle}
+.login-card .btn6{display:flex;width:100%}
 .login{min-height:100vh;display:grid;place-items:center;background:linear-gradient(160deg,#F7F3FF,#fff)}
 .login-card{max-width:460px;padding:36px;border:1px solid var(--line);border-radius:20px;background:#fff}
 .login-card h1{font-size:24px;margin:0 0 10px}.login-card p{color:var(--ink2)}.login-card .brand-name{padding:0 0 18px}

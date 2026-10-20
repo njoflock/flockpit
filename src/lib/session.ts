@@ -5,7 +5,7 @@ import { env } from './env';
 const COOKIE = 'flockpit_session';
 const secret = () => new TextEncoder().encode(env.sessionSecret());
 
-export type Session = { uid: string; email: string; name: string };
+export type Session = { uid: string; email: string; name: string; demo?: boolean };
 
 export async function createSession(s: Session) {
   const token = await new SignJWT({ ...s })
@@ -20,7 +20,7 @@ export async function getSession(): Promise<Session | null> {
   if (!t) return null;
   try {
     const { payload } = await jwtVerify(t, secret());
-    return { uid: String(payload.uid), email: String(payload.email), name: String(payload.name) };
+    return { uid: String(payload.uid), email: String(payload.email), name: String(payload.name), demo: !!payload.demo };
   } catch {
     return null;
   }
