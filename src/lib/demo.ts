@@ -82,7 +82,8 @@ export async function seedDemo(uid: string) {
       { user_id: uid, description: 'Revisar vacaciones de Martín (16 al 27 de noviembre)', project: 'Equipo', owner: 'Yo', due: isoDay(2), priority: 'media', note: 'Completar la tarea no aprueba las vacaciones.', source_key: 'mail:d-m2' },
       { user_id: uid, description: 'Actualizar forecast del trimestre', project: 'Banco Sur', owner: 'Yo', due: isoDay(-1), priority: 'alta', status: 'en_curso' },
       { user_id: uid, description: 'Preparar agenda del taller', project: 'Equipo', owner: 'Yo', due: null, priority: 'baja' },
-      { user_id: uid, description: 'Enviar feedback del MVP consolidado', project: 'Petrolera Norte', owner: 'Diego Sosa', due: isoDay(3), priority: 'media' },
+      { user_id: uid, description: 'Enviar feedback del MVP consolidado', project: 'Petrolera Norte', owner: 'Diego Sosa', due: isoDay(-2), priority: 'media' },
+      { user_id: uid, description: 'Compartir la planilla de cobertura del equipo', project: 'Equipo', owner: 'Lucía Paz', due: isoDay(4), priority: 'baja' },
     ]));
     await must(d.from('proposals').insert([
       { user_id: uid, key: 'mail:d-m6', action: 'Pasarle a Diego la fecha del próximo ajuste del MVP', project: 'Petrolera Norte', owner: 'Yo', priority: 'alta', reason: 'El cliente pidió una fecha concreta.', kind: 'respuesta', sources: [{ kind: 'email', subject: 'Feedback del MVP de proyección', from: 'Diego Sosa', date: at(-30 * H), snippet: '¿para cuándo podríamos tener el ajuste de cuellos de botella?' }] },

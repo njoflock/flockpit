@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 /* ---------- tipos ---------- */
 import { AUTO, AV, STATUS, SYNC_EVERY, TZ, api, avStyle, cap, dayKey, dueInfo, fmt, hhmm, initials, isMine, when } from '@/lib/shared';
 import type { Mail, Ev, Conv, Task, Prop, Sync, Day, Person, Topic } from '@/lib/shared';
-import { ClientsView, PeopleView, MeetingPrep } from './Views';
+import { ClientsView, PeopleView, MeetingPrep, DailyBrief, FollowUp, ReplyDraft, AskPanel } from './Views';
 export default function Workspace({ firstName }: { firstName: string }) {
   const [day, setDay] = useState<Day | null>(null);
   const [err, setErr] = useState('');
@@ -22,6 +22,9 @@ export default function Workspace({ firstName }: { firstName: string }) {
   const [agendaOpen, setAgendaOpen] = useState(false);
   const [panel, setPanel] = useState<{ type: string; id: string } | null>(null);
   const [view, setView] = useState<'dia' | 'clientes' | 'personas'>('dia');
+  const [askQ, setAskQ] = useState('');
+  const [lastSeen] = useState(() => (typeof window === 'undefined' ? 0 : Number(localStorage.getItem('flockpit:lastSeen') || 0)));
+  useEffect(() => { const t = setTimeout(() => localStorage.setItem('flockpit:lastSeen', String(Date.now())), 5000); return () => clearTimeout(t); }, []);
   const [sel, setSel] = useState('');
   const lastSync = useRef(0);
 
@@ -182,9 +185,12 @@ export default function Workspace({ firstName }: { firstName: string }) {
         {view === 'dia' && <div className="d6">
           <header className="h6">
             <div><h1>Buen día, <span>{firstName}</span></h1>{day.demo && <span className="demo-tag">Modo demo · datos ficticios</span>}<div className="h6-d">{cap(fmt(new Date(), { weekday: 'long', day: 'numeric', month: 'long' }))}</div></div>
+            <form className="ask-h" onSubmit={(e) => { e.preventDefault(); if (askQ.trim()) setPanel({ type: 'ask', id: askQ.trim() }); }}><input value={askQ} onChange={(e) => setAskQ(e.target.value)} placeholder="Preguntale a Flockpit…" aria-label="Preguntale a Flockpit" /></form>
             <button className="sync5" onClick={() => setPanel({ type: 'status', id: '' })}><i className={syncLabel.cls} />{syncLabel.text}</button>
             <button className="btn6" disabled={syncing} onClick={() => sync(false)}>{syncing ? 'Actualizando…' : 'Actualizar'}</button>
           </header>
+
+          <DailyBrief day={day} me={me} meEmail={day.me.email} open={open} lastSeen={lastSeen} />
 
           <section className="ag6">
             <div className="ag6-h"><h2>Tu agenda</h2>{otherDay ? <span className="muted">Hoy no quedan reuniones · {otherDay}</span> : <span className="cnt6">{upcoming.length} por delante hoy</span>}
@@ -317,6 +323,7 @@ function Panel({ panel, day, me, close, review, patchTask, proposal, createTask,
         <button className="btn6 ghost" onClick={() => setForm({ description: m.needs_reply ? `Responder a ${m.from_name}: ${m.subject}` : `Revisar: ${m.subject}`, project: '', owner: 'Yo', due: '', priority: 'media', source_key: `mail:${m.id}`, sources: [{ kind: 'email', subject: m.subject, from: m.from_name, date: m.received_at, snippet: m.preview.slice(0, 200), link: m.web_link }] })}>Crear tarea</button>
         <button className="btn6 ghost" onClick={() => review(`mail:${m.id}`)}>Marcar revisado</button>
       </Bar>
+      {day.ai && data && <div className="reply-row"><ReplyDraft context={`Correo de ${m.from_name} <${m.from_email}>\nAsunto: ${m.subject}\n\n${data.message?.body?.content || m.preview}`} /></div>}
       {m.reason && <div className="sug5"><b>Sugerencia de Claude:</b> {m.reason}</div>}
       {form && <TaskForm form={form} setForm={setForm} onSave={async () => { await createTask(form); setForm(null); }} />}
       {error && <div className="err-box">{error}</div>}
@@ -335,12 +342,18 @@ function Panel({ panel, day, me, close, review, patchTask, proposal, createTask,
         <button className="btn6 ghost" onClick={() => setForm({ description: c.short_title || `Responder a ${c.last_author} en ${c.title}`, project: '', owner: 'Yo', due: '', priority: 'media', source_key: `conv:${c.key}:${c.last_id}`, sources: [{ kind: 'message', platform: c.platform, subject: c.title, from: c.last_author, date: c.last_at, snippet: c.last_text.slice(0, 200), link: c.link }] })}>Crear tarea</button>
         <button className="btn6 ghost" onClick={() => review(`conv:${c.key}`, c.last_id)}>Marcar revisado</button>
       </Bar>
+      {day.ai && data?.messages && <div className="reply-row"><ReplyDraft context={`Conversación: ${c.title}\n` + data.messages.map((m: any) => `${m.author}: ${m.text}`).join('\n')} /></div>}
       {c.reason && <div className="sug5"><b>Sugerencia de Claude:</b> {c.reason}</div>}
       {form && <TaskForm form={form} setForm={setForm} onSave={async () => { await createTask(form); setForm(null); }} />}
       {error && <div className="err-box">{error}</div>}
       {!data && !error && <p className="muted">Cargando mensajes…</p>}
       {data?.messages?.map((m: any, i: number) => <div key={i} className={`msg5 ${m.author === 'Vos' ? 'me' : ''}`}><span className="av6" style={avStyle(m.author)}>{initials(m.author)}</span><div><div className="mh5"><b>{m.author}</b><span>{when(m.date)}</span>{m.reply && <span className="pl6 th">Respuesta</span>}</div><div className="mt5">{m.text}</div></div></div>)}
     </>;
+  } else if (panel.type === 'followup') {
+    const t = day.tasks.find((x) => x.id === panel.id);
+    body = t ? <FollowUp day={day} t={t} close={close} /> : <p>La tarea ya no existe.</p>;
+  } else if (panel.type === 'ask') {
+    body = <AskPanel initial={panel.id} open={open} close={close} />;
   } else if (panel.type === 'task' || panel.type === 'newtask') {
     const t = day.tasks.find((x) => x.id === panel.id);
     const f = form || (t ? { ...t, due: t.due || '' } : { description: '', project: '', owner: 'Yo', due: '', priority: 'media', status: 'pendiente', note: '' });
@@ -351,7 +364,7 @@ function Panel({ panel, day, me, close, review, patchTask, proposal, createTask,
         else await createTask(f);
         close();
       }} />
-      {t && t.status !== 'completada' && <Bar><button className="btn6 ghost" onClick={async () => { await patchTask(t.id, { status: 'completada' }, { status: t.status }); close(); }}>Completar</button>
+      {t && t.status !== 'completada' && <Bar>{!isMine(t, me) && <button className="btn6" onClick={() => open('followup', t.id)}>Preparar seguimiento</button>}<button className="btn6 ghost" onClick={async () => { await patchTask(t.id, { status: 'completada' }, { status: t.status }); close(); }}>Completar</button>
         <button className="btn6 ghost danger" onClick={async () => { if (confirm('¿Eliminar esta tarea?')) { await api(`/api/tasks/${t.id}`, { method: 'DELETE' }); await reload(); close(); } }}>Eliminar</button></Bar>}
       {t?.sources?.length ? <div className="sec"><h4>Fuente</h4>{t.sources.map((s: any, i: number) => <div key={i} className="ev"><b>{s.from}</b> · {s.subject} · {when(s.date)}<blockquote>{s.snippet}</blockquote>{s.link && <a href={s.link} target="_blank" rel="noreferrer">Abrir original</a>}</div>)}</div> : null}
     </>;

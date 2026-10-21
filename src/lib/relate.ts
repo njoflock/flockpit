@@ -120,3 +120,41 @@ export function prepAsText(e: Ev, prep: ReturnType<typeof meetingPrep>) {
   return L.join('\n');
 }
 export type { Task, Prop, Conv, Mail, Ev, Person };
+
+/* ---------- resumen de inicio del día ---------- */
+export function dailyBrief(day: Day, me: string, meEmail: string, lastSeen: number) {
+  const today = dayKey(new Date()), now = Date.now();
+  const mine = day.tasks.filter((t) => isMine(t, me));
+  const dueToday = mine.filter((t) => t.due === today);
+  const overdue = mine.filter((t) => t.due && t.due < today);
+  const lateOthers = day.tasks.filter((t) => !isMine(t, me) && t.due && t.due < today);
+  const waitingMail = day.mail.filter((m) => m.needs_reply);
+  const waitingConv = day.convs.filter((c) => c.needs_reply && c.last_author !== 'Vos');
+  const waitingPeople = [...new Set([...waitingMail.map((m) => m.from_name), ...waitingConv.map((c) => (c.kind === 'dm' ? c.title : c.last_author))])];
+  const newMail = lastSeen ? day.mail.filter((m) => Date.parse(m.received_at) > lastSeen && !AUTO.test(m.from_email)) : [];
+  const newConv = lastSeen ? day.convs.filter((c) => Date.parse(c.last_at) > lastSeen && c.last_author !== 'Vos') : [];
+  const newProps = lastSeen ? day.proposals.filter((p: any) => p.created_at && Date.parse(p.created_at) > lastSeen) : [];
+  const meetingsToday = day.events.filter((e) => !e.cancelled && !e.all_day && dayKey(new Date(e.start_at)) === today);
+  const next = meetingsToday.find((e) => Date.parse(e.end_at) > now) || null;
+  const risk = clients(day).map((c) => ({ c, d: clientData(day, c, me) })).filter((x) => x.d.health === 'riesgo').map((x) => x.c.name);
+  return { dueToday, overdue, lateOthers, waitingMail, waitingConv, waitingPeople, newMail, newConv, newProps, meetingsToday, next, risk };
+}
+export function briefAsText(b: ReturnType<typeof dailyBrief>) {
+  const L: string[] = [];
+  if (b.newMail.length || b.newConv.length) L.push(`Desde tu última visita: ${b.newMail.length} correos y ${b.newConv.length} mensajes nuevos.`);
+  b.overdue.forEach((t) => L.push(`Tarea vencida: ${t.description} (${t.project})`));
+  b.dueToday.forEach((t) => L.push(`Vence hoy: ${t.description} (${t.project})`));
+  b.waitingMail.forEach((m) => L.push(`Correo por responder de ${m.from_name}: ${m.subject}`));
+  b.waitingConv.forEach((c) => L.push(`Mensaje por responder en ${c.title} (${c.last_author}): ${c.last_text}`));
+  b.lateOthers.forEach((t) => L.push(`${t.owner} tiene atrasado: ${t.description} (plazo ${t.due})`));
+  b.meetingsToday.forEach((e) => L.push(`Reunión hoy: ${e.title}`));
+  b.risk.forEach((c) => L.push(`Cliente en riesgo: ${c}`));
+  return L.join('\n');
+}
+
+/* ---------- borrador de seguimiento sin IA ---------- */
+export function followUpTemplate(t: Task) {
+  const first = (t.owner || '').split(' ')[0] || 'Hola';
+  const when = t.due ? ` Habíamos quedado para el ${t.due.split('-').reverse().slice(0, 2).join('/')}.` : '';
+  return `Hola ${first}, ¿cómo venís con «${t.description}»?${when} Si necesitás algo de mi lado para avanzar, avisame. ¡Gracias!`;
+}

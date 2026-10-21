@@ -1,8 +1,9 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Day, Ev } from '@/lib/shared';
 import { api, avStyle, cap, dueInfo, fmt, hhmm, initials, when } from '@/lib/shared';
-import { clients, clientData, people, personData, meetingPrep, prepAsText, type PersonRow } from '@/lib/relate';
+import { clients, clientData, people, personData, meetingPrep, prepAsText, dailyBrief, briefAsText, followUpTemplate, type PersonRow } from '@/lib/relate';
+import type { Task } from '@/lib/shared';
 
 type Open = (type: string, id: string) => void;
 const HEALTH = { ok: { l: 'Al día', c: 'h-ok' }, atencion: { l: 'Requiere atención', c: 'h-warn' }, riesgo: { l: 'En riesgo', c: 'h-bad' } } as const;
@@ -159,6 +160,117 @@ export function MeetingPrep({ day, e, me, meEmail, open }: { day: Day; e: Ev; me
       {prep.proposals.length > 0 && <Section title="Accionables por confirmar" count={prep.proposals.length}>{prep.proposals.map((x) => <Item key={x.id} title={x.action} onClick={() => open('prop', x.id)} />)}</Section>}
       {prep.convs.length > 0 && <Section title="Conversaciones de las últimas dos semanas" count={prep.convs.length}>{prep.convs.map((c) => <Item key={c.key} title={c.title} sub={`${c.last_author}: ${c.last_text}`} right={<span className="muted">{when(c.last_at)}</span>} onClick={() => open('conv', c.key)} />)}</Section>}
       {prep.mails.length > 0 && <Section title="Correos de las últimas dos semanas" count={prep.mails.length}>{prep.mails.map((m) => <Item key={m.id} title={m.subject} sub={m.from_name} right={<span className="muted">{when(m.received_at)}</span>} onClick={() => open('mail', m.id)} />)}</Section>}
+    </div>
+  );
+}
+
+/* ================= Resumen de inicio del día ================= */
+
+export function DailyBrief({ day, me, meEmail, open, lastSeen }: { day: Day; me: string; meEmail: string; open: Open; lastSeen: number }) {
+  const b = useMemo(() => dailyBrief(day, me, meEmail, lastSeen), [day, me, meEmail, lastSeen]);
+  const [collapsed, setCollapsed] = useState(() => typeof window !== 'undefined' && localStorage.getItem('flockpit:briefCollapsed') === dayKeyNow());
+  const [ai, setAi] = useState<{ loading?: boolean; text?: string; error?: string }>({});
+  const toggle = () => { const v = !collapsed; setCollapsed(v); localStorage.setItem('flockpit:briefCollapsed', v ? dayKeyNow() : ''); };
+  async function summarize() {
+    setAi({ loading: true });
+    try { const r = await api<{ text: string }>('/api/ai', { method: 'POST', body: JSON.stringify({ mode: 'brief', context: briefAsText(b) }) }); setAi({ text: r.text }); }
+    catch (e) { setAi({ error: (e as Error).message }); }
+  }
+  const lines: { icon: string; cls: string; text: React.ReactNode; onClick?: () => void }[] = [];
+  if (b.newMail.length || b.newConv.length || b.newProps.length) lines.push({ icon: '✦', cls: 'b-new', text: <>Desde tu última visita: <b>{b.newMail.length}</b> correos, <b>{b.newConv.length}</b> mensajes y <b>{b.newProps.length}</b> accionables nuevos.</> });
+  b.overdue.slice(0, 3).forEach((t) => lines.push({ icon: '!', cls: 'b-late', text: <>Vencida: <b>{t.description}</b> · {t.project}</>, onClick: () => open('task', t.id) }));
+  b.dueToday.slice(0, 3).forEach((t) => lines.push({ icon: '◷', cls: 'b-today', text: <>Vence hoy: <b>{t.description}</b> · {t.project}</>, onClick: () => open('task', t.id) }));
+  if (b.waitingPeople.length) lines.push({ icon: '↩', cls: 'b-wait', text: <>Esperan tu respuesta: <b>{b.waitingPeople.slice(0, 4).join(', ')}</b>{b.waitingPeople.length > 4 ? ` y ${b.waitingPeople.length - 4} más` : ''}.</> });
+  b.lateOthers.slice(0, 3).forEach((t: Task) => lines.push({ icon: '⟲', cls: 'b-follow', text: <><b>{t.owner}</b> tiene atrasado: {t.description}. <span className="b-act">Preparar seguimiento</span></>, onClick: () => open('followup', t.id) }));
+  if (b.next) lines.push({ icon: '▸', cls: 'b-meet', text: <>Próxima reunión: <b>{hhmm(b.next.start_at)} · {b.next.title}</b>. <span className="b-act">Preparar</span></>, onClick: () => open('event', b.next!.id) });
+  if (b.risk.length) lines.push({ icon: '●', cls: 'b-late', text: <>Clientes en riesgo: <b>{b.risk.join(', ')}</b>.</> });
+  return (
+    <section className="brief">
+      <div className="brief-h"><h2>Tu resumen de hoy</h2><span className="muted">{b.meetingsToday.length} reuniones · {b.overdue.length + b.dueToday.length} tareas para hoy o vencidas · {b.waitingPeople.length} personas esperan respuesta</span>
+        {day.ai && !collapsed && <button className="btn6 ghost sm" onClick={summarize} disabled={ai.loading}>{ai.loading ? 'Resumiendo…' : 'Resumir con Claude'}</button>}
+        <button className="lk6" onClick={toggle}>{collapsed ? 'Mostrar' : 'Ocultar'}</button></div>
+      {!collapsed && <>
+        {ai.text && <div className="sug5" style={{ whiteSpace: 'pre-wrap' }}>{ai.text}</div>}
+        {ai.error && <div className="err-box">{ai.error}</div>}
+        <ul className="brief-l">{lines.length ? lines.map((l, i) => <li key={i} className={`${l.cls} ${l.onClick ? 'click' : ''}`} onClick={l.onClick}><span className="b-ic">{l.icon}</span><span>{l.text}</span></li>) : <li className="b-ok"><span className="b-ic">✓</span><span>Nada urgente: no hay vencimientos, respuestas pendientes ni atrasos.</span></li>}</ul>
+      </>}
+    </section>
+  );
+}
+const dayKeyNow = () => new Date().toISOString().slice(0, 10);
+
+/* ================= Seguimiento con borrador ================= */
+export function FollowUp({ day, t, close }: { day: Day; t: Task; close: () => void }) {
+  const [text, setText] = useState(() => followUpTemplate(t));
+  const [state, setState] = useState<{ loading?: boolean; error?: string; copied?: boolean }>({});
+  const link = (t.sources || []).find((s: any) => s.link)?.link as string | undefined;
+  async function improve() {
+    setState({ loading: true });
+    try { const r = await api<{ text: string }>('/api/ai', { method: 'POST', body: JSON.stringify({ mode: 'followup', context: `Persona: ${t.owner}\nCompromiso: ${t.description}\nProyecto: ${t.project}\nPlazo acordado: ${t.due || 'sin plazo'}\nNota: ${t.note || ''}` }) }); setText(r.text); setState({}); }
+    catch (e) { setState({ error: (e as Error).message }); }
+  }
+  const late = t.due ? Math.round((Date.now() - Date.parse(t.due + 'T12:00:00Z')) / 864e5) : 0;
+  return (
+    <div>
+      <div className="dr-h"><div><div className="k">Seguimiento · {t.project}</div><h2>{t.description}</h2></div><button className="x" onClick={close} aria-label="Cerrar">✕</button></div>
+      <p className="muted">A cargo de <b>{t.owner}</b>{t.due ? ` · plazo ${t.due.split('-').reverse().join('/')}${late > 0 ? ` · atrasado ${late} día${late === 1 ? '' : 's'}` : ''}` : ''}</p>
+      <label className="dfld"><span>Mensaje sugerido (revisalo antes de enviarlo)</span><textarea className="draft" value={text} onChange={(e) => setText(e.target.value)} /></label>
+      {state.error && <div className="err-box">{state.error}</div>}
+      <div className="dr5-bar">
+        <button className="btn6" onClick={async () => { await navigator.clipboard.writeText(text); setState({ copied: true }); }}>{state.copied ? 'Copiado ✓' : 'Copiar mensaje'}</button>
+        {link && <a className="btn6 ghost" href={link} target="_blank" rel="noreferrer">Abrir conversación original</a>}
+        {day.ai && <button className="btn6 ghost" onClick={improve} disabled={state.loading}>{state.loading ? 'Redactando…' : 'Redactar con Claude'}</button>}
+      </div>
+      <p className="muted" style={{ fontSize: 13 }}>Flockpit no envía mensajes: copialo y mandalo desde Outlook, Teams o Slack.</p>
+    </div>
+  );
+}
+
+/* ================= Borrador de respuesta ================= */
+export function ReplyDraft({ context }: { context: string }) {
+  const [s, setS] = useState<{ loading?: boolean; text?: string; error?: string; copied?: boolean }>({});
+  async function go() {
+    setS({ loading: true });
+    try { const r = await api<{ text: string }>('/api/ai', { method: 'POST', body: JSON.stringify({ mode: 'reply', context }) }); setS({ text: r.text }); }
+    catch (e) { setS({ error: (e as Error).message }); }
+  }
+  if (!s.text && !s.error) return <button className="btn6 ghost" onClick={go} disabled={s.loading}>{s.loading ? 'Redactando…' : 'Sugerir respuesta'}</button>;
+  return (
+    <div className="tf5" style={{ width: '100%' }}>
+      {s.error ? <div className="err-box">{s.error}</div> : <>
+        <label className="dfld"><span>Borrador de respuesta (revisalo antes de enviarlo)</span><textarea className="draft" value={s.text} onChange={(e) => setS({ ...s, text: e.target.value })} /></label>
+        <button className="btn6" onClick={async () => { await navigator.clipboard.writeText(s.text || ''); setS({ ...s, copied: true }); }}>{s.copied ? 'Copiado ✓' : 'Copiar'}</button>
+      </>}
+    </div>
+  );
+}
+
+/* ================= Preguntale a Flockpit ================= */
+type AskSrc = { type: string; id: string; title: string; sub: string; date: string | null; link: string | null; n?: number; cited?: boolean };
+export function AskPanel({ initial, open, close }: { initial: string; open: Open; close: () => void }) {
+  const [q, setQ] = useState(initial);
+  const [r, setR] = useState<{ loading?: boolean; answer?: string | null; sources?: AskSrc[]; note?: string; error?: string }>({});
+  async function ask(question: string) {
+    if (!question.trim()) return;
+    setR({ loading: true });
+    try { setR(await api('/api/ask', { method: 'POST', body: JSON.stringify({ q: question }) })); }
+    catch (e) { setR({ error: (e as Error).message }); }
+  }
+  useEffect(() => { ask(initial); }, [initial]); // eslint-disable-line
+  const linkify = (text: string) => text.split(/(\[\d+\])/g).map((part, i) => {
+    const m = part.match(/^\[(\d+)\]$/); const src = m && r.sources?.find((s) => s.n === Number(m[1]));
+    return src ? <button key={i} className="cite" onClick={() => open(src.type, src.id)} title={src.title}>{m![1]}</button> : <span key={i}>{part}</span>;
+  });
+  return (
+    <div>
+      <div className="dr-h"><div><div className="k">Preguntale a Flockpit</div><h2>Buscá en tus correos, mensajes, reuniones y tareas</h2></div><button className="x" onClick={close} aria-label="Cerrar">✕</button></div>
+      <form className="ask-f" onSubmit={(e) => { e.preventDefault(); ask(q); }}><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Por ejemplo: ¿qué quedó con Andes sobre el back office?" autoFocus /><button className="btn6" type="submit">Preguntar</button></form>
+      {r.loading && <p className="muted">Buscando…</p>}
+      {r.error && <div className="err-box">{r.error}</div>}
+      {r.answer && <div className="ask-a">{linkify(r.answer)}</div>}
+      {r.note && <p className="muted">{r.note}</p>}
+      {!!r.sources?.length && <section className="v-sec"><h3>Fuentes<span className="cnt6">{r.sources.length}</span></h3>
+        {r.sources.map((s) => <Item key={s.type + s.id} title={`${s.n ? `[${s.n}] ` : ''}${s.title}`} sub={`${s.sub}${s.date ? ' · ' + when(s.date) : ''}`} right={s.cited ? <span className="v-tag">Citada</span> : undefined} onClick={() => open(s.type, s.id)} />)}</section>}
     </div>
   );
 }
