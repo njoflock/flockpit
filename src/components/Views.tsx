@@ -84,7 +84,7 @@ export function PeopleView({ day, me, meEmail, open, reload }: { day: Day; me: s
   const shown = list.filter(({ p }) => !q || p.name.toLowerCase().includes(q.toLowerCase()));
   const cur = list.find((x) => x.p.name === sel) || shown[0];
   if (!list.length) return <div className="v-empty-page"><h2>Personas</h2><p className="muted">Todavía no hay personas. Aparecen a partir de tus correos, chats, reuniones y seguimientos.</p></div>;
-  const d = cur.d, topics = (day.topics || []).filter((t) => t.person === cur.p.name);
+  const d = cur.d, topics = (Array.isArray(day.topics) ? day.topics : []).filter((t) => t.person === cur.p.name);
   async function addTopic() {
     if (!text.trim()) return;
     await api('/api/topics', { method: 'POST', body: JSON.stringify({ person: cur.p.name, text }) });
@@ -99,7 +99,7 @@ export function PeopleView({ day, me, meEmail, open, reload }: { day: Day; me: s
           <button key={p.name} className={`v-row ${cur.p.name === p.name ? 'sel' : ''}`} onClick={() => setSel(p.name)}>
             <span className="av6" style={avStyle(p.name)}>{initials(p.name)}</span>
             <span className="v-row-b"><b>{p.name}</b><span>{d.oneOnOne ? `Próxima reunión: ${meetingLabel(d.oneOnOne)}` : p.email || ''}</span></span>
-            {(d.auto.length + (day.topics || []).filter((t) => t.person === p.name && !t.done).length) > 0 && <span className="cnt6">{d.auto.length + (day.topics || []).filter((t) => t.person === p.name && !t.done).length}</span>}
+            {(d.auto.length + (Array.isArray(day.topics) ? day.topics : []).filter((t) => t.person === p.name && !t.done).length) > 0 && <span className="cnt6">{d.auto.length + (Array.isArray(day.topics) ? day.topics : []).filter((t) => t.person === p.name && !t.done).length}</span>}
           </button>
         ))}
       </aside>

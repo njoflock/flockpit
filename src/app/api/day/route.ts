@@ -17,7 +17,8 @@ export async function GET() {
       must(d.from('reviews').select('*').eq('user_id', uid)),
       must(d.from('sync_state').select('*').eq('user_id', uid)),
       must(d.from('connections').select('provider,status,last_error,updated_at').eq('user_id', uid)),
-      d.from('person_topics').select('*').eq('user_id', uid).order('created_at').then((r) => ({ data: r.data || [], error: null })),
+      // Si la tabla todavía no existe, se devuelve una lista vacía en lugar de fallar.
+      d.from('person_topics').select('*').eq('user_id', uid).order('created_at').then((r) => r.data || []),
     ]);
     return NextResponse.json({ me: s, demo: !!s.demo, ai: !!process.env.ANTHROPIC_API_KEY, topics, mail, events, convs, tasks, proposals, reviews, sync, conns });
   });

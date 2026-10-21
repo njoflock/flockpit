@@ -105,7 +105,7 @@ export function meetingPrep(day: Day, e: Ev, me: string, meEmail: string) {
   const since = Date.now() - 14 * DAY;
   const convs = [...new Map([...(cd?.convs || []), ...perPerson.flatMap(({ d }) => d.convs)].map((c) => [c.key, c])).values()].filter((c) => Date.parse(c.last_at) > since).slice(0, 6);
   const mails = [...new Map([...(cd?.mails || []), ...perPerson.flatMap(({ d }) => d.mails)].map((m) => [m.id, m])).values()].filter((m) => Date.parse(m.received_at) > since).slice(0, 6);
-  const topics = (day.topics || []).filter((t) => !t.done && participants.some((p) => norm(p.name) === norm(t.person)));
+  const topics = (Array.isArray(day.topics) ? day.topics : []).filter((t) => !t.done && participants.some((p) => norm(p.name) === norm(t.person)));
   return { participants, client, alerts: cd?.alerts || [], theirCommitments, myCommitments, proposals, convs, mails, topics };
 }
 export function prepAsText(e: Ev, prep: ReturnType<typeof meetingPrep>) {
