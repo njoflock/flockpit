@@ -1,0 +1,17 @@
+# Sincroniza Flockpit cada 10 minutos, también con la app cerrada.
+# Configurá en GitHub > Settings > Secrets and variables > Actions:
+#   FLOCKPIT_URL  (por ejemplo https://flockpit.vercel.app)
+#   CRON_SECRET   (el mismo valor que en Vercel)
+name: Sincronizar Flockpit
+on:
+  schedule:
+    - cron: "*/10 10-23 * * 1-5"   # cada 10 min, de lunes a viernes, 7 a 20 h de Argentina (UTC-3)
+  workflow_dispatch: {}
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Llamar a la sincronización
+        run: |
+          curl -fsS -X GET "${{ secrets.FLOCKPIT_URL }}/api/cron/sync" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" --max-time 280

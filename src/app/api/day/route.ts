@@ -8,7 +8,7 @@ export async function GET() {
   return handle(async () => {
     const s = await requireUser(), uid = s.uid, d = db();
     const since = new Date(Date.now() - 8 * 864e5).toISOString(), until = new Date(Date.now() + 8 * 864e5).toISOString();
-    const [mail, events, convs, tasks, proposals, reviews, sync, conns] = await Promise.all([
+    const [mail, events, convs, tasks, proposals, reviews, sync, conns, topics] = await Promise.all([
       must(d.from('mail_items').select('*').eq('user_id', uid).order('received_at', { ascending: false }).limit(200)),
       must(d.from('events').select('*').eq('user_id', uid).gte('start_at', since).lte('start_at', until).order('start_at')),
       must(d.from('conversations').select('*').eq('user_id', uid).order('last_at', { ascending: false }).limit(150)),
@@ -17,7 +17,8 @@ export async function GET() {
       must(d.from('reviews').select('*').eq('user_id', uid)),
       must(d.from('sync_state').select('*').eq('user_id', uid)),
       must(d.from('connections').select('provider,status,last_error,updated_at').eq('user_id', uid)),
+      d.from('person_topics').select('*').eq('user_id', uid).order('created_at').then((r) => ({ data: r.data || [], error: null })),
     ]);
-    return NextResponse.json({ me: s, demo: !!s.demo, mail, events, convs, tasks, proposals, reviews, sync, conns });
+    return NextResponse.json({ me: s, demo: !!s.demo, ai: !!process.env.ANTHROPIC_API_KEY, topics, mail, events, convs, tasks, proposals, reviews, sync, conns });
   });
 }

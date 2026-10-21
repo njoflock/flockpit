@@ -26,11 +26,14 @@ const MAIL = [
   { id: 'd-m11', subject: 'Presupuesto actualizado', from_name: 'Pablo Ríos', from_email: 'pablo.rios@bancosur.example', ago: 3 * D, read: true, needs: false, att: null, reason: 'Informativo.', short: null, preview: 'Te reenvío el presupuesto actualizado con los cambios que conversamos.' },
   { id: 'd-m12', subject: 'Encuesta de satisfacción', from_name: 'Calidad', from_email: 'calidad@flock.example', ago: 4 * D, read: true, needs: false, att: null, reason: 'Informativo.', short: null, preview: 'Gracias por completar la encuesta mensual.' },
 ];
+const P = (name: string, email: string) => ({ name, email });
 const EVENTS = [
-  { id: 'd-e1', title: 'Daily del equipo', h: 9, m: 30, dur: 15, join: true },
-  { id: 'd-e2', title: 'Revisión de entrega · Andes Logística', h: 11, m: 0, dur: 30, join: true },
-  { id: 'd-e3', title: 'Coordinación con Banco Sur', h: 14, m: 0, dur: 45, join: true },
-  { id: 'd-e4', title: 'Uno a uno con Lucía', h: 16, m: 0, dur: 30, join: false },
+  { id: 'd-e1', title: 'Daily del equipo', h: 9, m: 30, dur: 15, join: true, att: [P('Lucía Paz', 'lucia.paz@flock.example'), P('Martín Ruiz', 'martin.ruiz@flock.example'), P('Nico Vega', 'nico.vega@flock.example')] },
+  { id: 'd-e2', title: 'Revisión de entrega · Andes Logística', h: 11, m: 0, dur: 30, join: true, att: [P('Carla Méndez', 'carla.mendez@andeslogistica.com'), P('Nico Vega', 'nico.vega@flock.example')] },
+  { id: 'd-e3', title: 'Coordinación con Banco Sur', h: 14, m: 0, dur: 45, join: true, att: [P('Pablo Ríos', 'pablo.rios@bancosur.example'), P('Sofía Gil', 'sofia.gil@flock.example')] },
+  { id: 'd-e4', title: 'Uno a uno con Lucía', h: 16, m: 0, dur: 30, join: false, att: [P('Lucía Paz', 'lucia.paz@flock.example')] },
+  { id: 'd-e5', title: 'Uno a uno con Martín', h: 10, m: 0, dur: 30, join: false, day: 1, att: [P('Martín Ruiz', 'martin.ruiz@flock.example')] },
+  { id: 'd-e6', title: 'Seguimiento del MVP · Petrolera Norte', h: 15, m: 0, dur: 45, join: true, day: 2, att: [P('Diego Sosa', 'diego.sosa@petroleranorte.com'), P('Nico Vega', 'nico.vega@flock.example')] },
 ];
 const CONVS = [
   { key: 'slack:DEMO1', platform: 'slack', kind: 'dm', title: 'Martín Ruiz', author: 'Martín Ruiz', text: '¿Podemos hablar 10 minutos sobre las vacaciones?', ago: 50 * 60e3, needs: true, reason: 'Pide una charla breve antes de que revises su solicitud.', short: 'Responder a Martín por vacaciones' },
@@ -65,8 +68,8 @@ export async function seedDemo(uid: string) {
   }))));
   await d.from('events').delete().eq('user_id', uid);
   await must(d.from('events').insert(EVENTS.map((e) => ({
-    user_id: uid, id: e.id, title: e.title, start_at: todayAt(e.h, e.m), end_at: new Date(Date.parse(todayAt(e.h, e.m)) + e.dur * 60e3).toISOString(),
-    all_day: false, cancelled: false, location: e.join ? 'Reunión de Microsoft Teams' : 'Oficina', join_url: null, web_link: null, organizer: 'Demo',
+    user_id: uid, id: e.id, title: e.title, start_at: new Date(Date.parse(todayAt(e.h, e.m)) + (e.day || 0) * D).toISOString(), end_at: new Date(Date.parse(todayAt(e.h, e.m)) + (e.day || 0) * D + e.dur * 60e3).toISOString(),
+    all_day: false, cancelled: false, location: e.join ? 'Reunión de Microsoft Teams' : 'Oficina', join_url: null, web_link: null, organizer: 'Demo', attendees: e.att,
   }))));
   await must(d.from('conversations').upsert(CONVS.map((c) => ({
     user_id: uid, key: c.key, platform: c.platform, kind: c.kind, title: c.title, last_id: c.key + ':last', last_author: c.author, last_text: c.text,
@@ -86,6 +89,10 @@ export async function seedDemo(uid: string) {
       { user_id: uid, key: 'mail:d-m3', action: 'Decidir si se mueve la validación al martes', project: 'Equipo', owner: 'Yo', priority: 'media', reason: 'Lucía propone cambiar la fecha.', kind: 'aprobacion', sources: [{ kind: 'email', subject: 'Propuesta de reprogramación de la validación', from: 'Lucía Paz', date: at(-5 * H), snippet: 'Propongo mover la validación del jueves al martes a las 16:30.' }] },
       { user_id: uid, key: 'conv:teams:DEMO3:x', action: 'Confirmar la reunión del jueves con Banco Sur', project: 'Banco Sur', owner: 'Yo', priority: 'media', reason: 'Te mencionaron en el chat del equipo.', kind: 'respuesta', sources: [{ kind: 'message', platform: 'teams', subject: 'Equipo Banco Sur', from: 'Pablo Ríos', date: at(-3 * H), snippet: '@Natalia ¿confirmás la reunión del jueves?' }] },
     ]));
+    await d.from('person_topics').insert([
+      { user_id: uid, person: 'Lucía Paz', text: 'Revisar cómo viene la carga del equipo para noviembre' },
+      { user_id: uid, person: 'Martín Ruiz', text: 'Hablar de su plan de capacitación' },
+    ]);
   }
   const now = at(0);
   await must(d.from('sync_state').upsert(['mail', 'calendar', 'teams', 'slack', 'analysis'].map((s) => ({

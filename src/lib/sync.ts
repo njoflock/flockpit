@@ -31,13 +31,15 @@ async function syncCalendar(uid: string) {
   const start = new Date(Date.now() - 7 * DAY), end = new Date(Date.now() + 8 * DAY);
   start.setUTCHours(0, 0, 0, 0);
   const res = await graph<{ value: any[] }>(uid,
-    `/me/calendarView?startDateTime=${start.toISOString()}&endDateTime=${end.toISOString()}&$top=200&$select=id,subject,start,end,isAllDay,isCancelled,location,onlineMeeting,webLink,organizer`,
+    `/me/calendarView?startDateTime=${start.toISOString()}&endDateTime=${end.toISOString()}&$top=200&$select=id,subject,start,end,isAllDay,isCancelled,location,onlineMeeting,webLink,organizer,attendees`,
     { Prefer: 'outlook.timezone="UTC"' });
   const iso = (d: { dateTime: string }) => new Date(d.dateTime.replace(/\.\d+$/, '') + 'Z').toISOString();
   const rows = res.value.map((e) => ({
     user_id: uid, id: e.id, title: (e.subject || '(Sin título)').replace(/^(Canceled|Cancelado):\s*/i, ''), start_at: iso(e.start), end_at: iso(e.end),
     all_day: !!e.isAllDay, cancelled: !!e.isCancelled, location: e.location?.displayName || null, join_url: e.onlineMeeting?.joinUrl || null,
-    web_link: e.webLink, organizer: e.organizer?.emailAddress?.name || null, updated_at: new Date().toISOString(),
+    web_link: e.webLink, organizer: e.organizer?.emailAddress?.name || null,
+    attendees: (e.attendees || []).map((a: any) => ({ name: a.emailAddress?.name || a.emailAddress?.address, email: a.emailAddress?.address || null })),
+    updated_at: new Date().toISOString(),
   }));
   // Lo que ya no está en el calendario dentro de la ventana se elimina (reuniones borradas o reemplazadas).
   await db().from('events').delete().eq('user_id', uid).gte('start_at', start.toISOString()).lte('start_at', end.toISOString());
